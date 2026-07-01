@@ -335,28 +335,32 @@ const BOT_PERSONAS = [
     flavor:"This bot is aggressive on premium names and is willing to pay up for top-tier talent.",
     tierMult:{superstar:1.24, star:1.13, starter:0.99, role:0.88, bench:0.78},
     statMult:{ppg:1.14, rpg:0.94, apg:1.00, def:0.88},
-    budgetDiscipline:1.08, aggression:0.94, caution:0.32, floor:0.42
+    budgetDiscipline:1.08, aggression:0.94, caution:0.32, floor:0.42,
+    pricePressure:0.16, pressureRisk:0.92
   },
   {
     name:"Value Hunter",
     flavor:"This bot is disciplined, avoids bidding wars, and still scales spending with player quality.",
     tierMult:{superstar:1.02, star:0.99, starter:0.94, role:0.88, bench:0.80},
     statMult:{ppg:0.98, rpg:1.04, apg:1.05, def:1.05},
-    budgetDiscipline:0.86, aggression:0.80, caution:0.48, floor:0.28
+    budgetDiscipline:0.86, aggression:0.80, caution:0.48, floor:0.28,
+    pricePressure:0.34, pressureRisk:0.88
   },
   {
     name:"Balanced Builder",
     flavor:"This bot plays close to the board and tries to build a clean, well-rounded roster.",
     tierMult:{superstar:1.08, star:1.03, starter:0.97, role:0.90, bench:0.83},
     statMult:{ppg:1.00, rpg:1.00, apg:1.00, def:1.00},
-    budgetDiscipline:0.98, aggression:0.87, caution:0.39, floor:0.34
+    budgetDiscipline:0.98, aggression:0.87, caution:0.39, floor:0.34,
+    pricePressure:0.24, pressureRisk:0.86
   },
   {
     name:"Cap Manager",
     flavor:"This bot is cautious with the budget, but still reserves its biggest bids for the best players.",
     tierMult:{superstar:1.05, star:1.00, starter:0.93, role:0.86, bench:0.78},
     statMult:{ppg:0.96, rpg:1.03, apg:1.02, def:1.08},
-    budgetDiscipline:0.78, aggression:0.76, caution:0.52, floor:0.25
+    budgetDiscipline:0.78, aggression:0.76, caution:0.52, floor:0.25,
+    pricePressure:0.30, pressureRisk:0.84
   },
 ];
 
@@ -427,6 +431,46 @@ function estimateToBidCap(estimate, persona, player){
   const tierAnchor = {superstar:13, star:10, starter:7, role:4, bench:2}[player.tier];
   const statAnchor = clamp(Math.round((estimate - 8) / 7), 1, 15);
   return clamp(Math.round((tierAnchor*0.4 + statAnchor*0.6) * persona.budgetDiscipline), 1, 15);
+}
+
+function neutralBidCap(player, side='bot'){
+  const neutralEstimate = statBasedTrueValue(player) * positionalFitMultiplier(side, player);
+  return estimateToBidCap(neutralEstimate, {budgetDiscipline:1}, player);
+}
+
+function botPricePressureDecision(player, persona, nextBid, normalWillingness, est, leverage=false){
+  // The bot can make calculated pressure bids when the human is currently winning.
+  // This is not a true desire cap; it is a risk-adjusted attempt to make strong
+  // players cost closer to fair value. If the human stops, the bot might get stuck
+  // with the player, so the pressure cap stays below the bot's neutral fair price.
+  if(!G || !G.auction || G.auction.bidder !== 'user') return false;
+  if(G.auction.bid <= 0 || leverage || G.slots.bot <= 0 || G.slots.user <= 0) return false;
+  if(nextBid > maxBid('bot')) return false;
+  // Do not pressure-bid when the human cannot actually respond. That turns a
+  // nuisance raise into a near-certain accidental win.
+  if(nextBid + 1 > maxBid('user')) return false;
+  if(player.tier === 'bench') return false;
+
+  const fairCap = neutralBidCap(player, 'bot');
+  const pressureCap = Math.min(maxBid('bot'), Math.max(normalWillingness, Math.round(fairCap * persona.pressureRisk)));
+  if(nextBid > pressureCap) return false;
+
+  const quality = {
+    superstar:1.00,
+    star:0.76,
+    starter:0.42,
+    role:0.18,
+    bench:0.00,
+  }[player.tier] || 0.35;
+  const highEndBoost = player.tier==='superstar' && est >= 90 ? 0.12 : 0;
+  const cheapEnoughBoost = nextBid <= Math.max(3, normalWillingness + 1) ? 0.08 : 0;
+  const riskProgress = nextBid / Math.max(pressureCap,1);
+  const chance = clamp((persona.pricePressure || 0) * quality * (1 - riskProgress*0.55) + highEndBoost + cheapEnoughBoost, 0, 0.55);
+  const decision = Math.random() < chance;
+  if(decision){
+    debugMsg(`${persona.name} pressure-bids ${player.name}: next $${nextBid}, normal cap $${normalWillingness}, pressure cap $${pressureCap}, chance ${(chance*100).toFixed(0)}%.`);
+  }
+  return decision;
 }
 
 function botLateDraftLeverage(player, est, normalWillingness, persona){
@@ -690,6 +734,14 @@ function botAuctionMove(){
   const openingBid = G.auction.bid===0;
 
   if(nextBid > cap){
+    if(!openingBid && botPricePressureDecision(player, G.persona, nextBid, normalWillingness, est, leverage)){
+      G.auction.bid = nextBid;
+      G.auction.bidder = 'bot';
+      G.auction.turn = 'user';
+      logMsg('bot', `Bot raises to $${nextBid}.`);
+      render();
+      return;
+    }
     // This is the only final-slot exception: the bot cannot bid money it does not have.
     if(openingBid){
       passBeforeOpeningBid('bot');
@@ -711,6 +763,14 @@ function botAuctionMove(){
     // Final-slot and leverage situations override that hesitation.
     const pushThrough = finalSpotMustFill || Math.random() < botPushProbability(nextBid, cap, player, G.persona, leverage);
     if(!pushThrough){
+      if(botPricePressureDecision(player, G.persona, nextBid, normalWillingness, est, leverage)){
+        G.auction.bid = nextBid;
+        G.auction.bidder = 'bot';
+        G.auction.turn = 'user';
+        logMsg('bot', `Bot raises to $${nextBid}.`);
+        render();
+        return;
+      }
       logMsg('bot', `Bot passes on ${player.name} at $${G.auction.bid}.`);
       resolveAuction(G.auction.bidder);
       return;
