@@ -681,12 +681,16 @@ function botAuctionMove(){
   const est = botEstimate(player, G.persona, 'bot');
   const normalWillingness = estimateToBidCap(est, G.persona, player);
   const leverage = botLateDraftLeverage(player, est, normalWillingness, G.persona);
-  const willingness = leverage ? maxBid('bot') : normalWillingness;
+  const finalSpotMustFill = G.slots.bot === 1;
+  // If the bot only has one roster spot left, saving money no longer matters.
+  // It should not voluntarily pass/send a player back; it pushes until its real budget cap.
+  const willingness = (finalSpotMustFill || leverage) ? maxBid('bot') : normalWillingness;
   const cap = Math.min(willingness, maxBid('bot'));
   const nextBid = G.auction.bid + 1;
   const openingBid = G.auction.bid===0;
 
   if(nextBid > cap){
+    // This is the only final-slot exception: the bot cannot bid money it does not have.
     if(openingBid){
       passBeforeOpeningBid('bot');
     } else {
@@ -697,14 +701,15 @@ function botAuctionMove(){
   }
 
   if(openingBid){
-    const wantsToOpen = leverage || Math.random() < botOpeningProbability(player, cap, est, G.persona);
+    const wantsToOpen = finalSpotMustFill || leverage || Math.random() < botOpeningProbability(player, cap, est, G.persona);
     if(!wantsToOpen){
       passBeforeOpeningBid('bot');
       return;
     }
   } else {
     // Occasionally the bot backs off before its cap, with the chance controlled by persona.
-    const pushThrough = Math.random() < botPushProbability(nextBid, cap, player, G.persona, leverage);
+    // Final-slot and leverage situations override that hesitation.
+    const pushThrough = finalSpotMustFill || Math.random() < botPushProbability(nextBid, cap, player, G.persona, leverage);
     if(!pushThrough){
       logMsg('bot', `Bot passes on ${player.name} at $${G.auction.bid}.`);
       resolveAuction(G.auction.bidder);
