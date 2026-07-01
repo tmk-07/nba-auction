@@ -633,7 +633,7 @@ function firstBidderFor(nominationNumber){
 }
 
 function startRound(idx){
-  if(G.slots.user<=0 && G.slots.bot<=0){ endGame(); return; }
+  if(maybeAutoFillAfterRosterFull()) return;
   if(idx >= G.order.length){ endGame(); return; }
   const player = G.order[idx];
   const opener = firstBidderFor(G.nominationCount);
@@ -661,6 +661,47 @@ function recycleAuctionPlayer(){
   render();
 }
 
+function availableUndraftedPlayers(){
+  return G.order.filter(p=>!p.drafted);
+}
+
+function autoFillRemainingRoster(side){
+  if(G.slots[side] <= 0) return;
+  const needed = G.slots[side];
+  const candidates = availableUndraftedPlayers().slice(0, needed);
+  if(!candidates.length) return;
+  logMsg('sys', `${side==='user'?'Your':'Bot'} remaining ${needed} roster spot${needed===1?'':'s'} ${needed===1?'is':'are'} filled automatically because the other roster is full.`);
+  candidates.forEach(player=>{
+    const price = 1;
+    player.drafted = true;
+    player.soldTo = side;
+    player.soldPrice = price;
+    G.budgets[side] -= price;
+    G.slots[side] -= 1;
+    G.rosters[side].push(player);
+    assignPosition(side, player);
+    logMsg('sys', `${side==='user'?'YOU receive':'BOT receives'} ${player.name} automatically for $${price}.`);
+  });
+}
+
+function maybeAutoFillAfterRosterFull(){
+  if(G.slots.user <= 0 && G.slots.bot > 0){
+    autoFillRemainingRoster('bot');
+    endGame();
+    return true;
+  }
+  if(G.slots.bot <= 0 && G.slots.user > 0){
+    autoFillRemainingRoster('user');
+    endGame();
+    return true;
+  }
+  if(G.slots.user <= 0 && G.slots.bot <= 0){
+    endGame();
+    return true;
+  }
+  return false;
+}
+
 function passBeforeOpeningBid(side){
   if(!G.auction || G.auction.bidder) return;
   const player = G.order.find(p=>p.id===G.auction.playerId);
@@ -681,7 +722,7 @@ function passBeforeOpeningBid(side){
 
 /* ---------------- BIDDING ---------------- */
 function userRaise(amount){
-  if(!G.auction || G.auction.turn!=='user') return;
+  if(!G.auction || G.auction.turn!=='user' || G.slots.user<=0) return;
   const openingBid = G.auction.bid===0;
   const newBid = G.auction.bid + amount;
   if(newBid > maxBid('user')) return;
@@ -695,6 +736,7 @@ function userRaise(amount){
 
 function userPass(){
   if(!G.auction || G.auction.turn!=='user') return;
+  if(G.slots.user<=0){ maybeAutoFillAfterRosterFull(); return; }
   if(!G.auction.bidder){
     passBeforeOpeningBid('user');
     return;
@@ -721,6 +763,7 @@ function botOpeningProbability(player, cap, est, persona){
 
 function botAuctionMove(){
   if(!G.auction || G.auction.turn!=='bot') return;
+  if(G.slots.bot<=0){ maybeAutoFillAfterRosterFull(); return; }
   const player = G.order.find(p=>p.id===G.auction.playerId);
   const est = botEstimate(player, G.persona, 'bot');
   const normalWillingness = estimateToBidCap(est, G.persona, player);
@@ -800,7 +843,8 @@ function resolveAuction(winnerSide){
   G.auction = null;
   G.roundIndex += 1;
 
-  if(G.roundIndex >= G.order.length || (G.slots.user<=0 && G.slots.bot<=0)){
+  if(maybeAutoFillAfterRosterFull()) return;
+  if(G.roundIndex >= G.order.length){
     endGame();
     return;
   }
