@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NBA Auction</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --court-bg: #14151A;
+    --panel-bg: #1C1E26;
+    --panel-bg-2: #23252F;
+    --hardwood: #C9862B;
+    --gold: #E8B84B;
+    --chalk: #F2EFE9;
+    --chalk-dim: #9A9CA8;
+    --danger: #C24E4E;
+    --success: #3FA57A;
+    --line: #33353F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--court-bg); color:var(--chalk);
+    font-family:'Inter',sans-serif;
+    padding:20px; min-height:100vh;
+  }
+  .wrap{max-width:1000px; margin:0 auto;}
+  h1{
+    font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:0.03em;
+    text-transform:uppercase; font-size:28px; margin:0 0 4px 0; color:var(--chalk);
+  }
+  .subtitle{color:var(--chalk-dim); font-size:13px; margin-bottom:18px;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* Scoreboard */
+  .scoreboard{
+    display:flex; gap:14px; margin-bottom:18px; flex-wrap:wrap;
+  }
+  .score-card{
+    flex:1; min-width:140px; background:var(--panel-bg); border:1px solid var(--line);
+    border-radius:6px; padding:12px 16px;
+  }
+  .score-card .label{font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--chalk-dim);}
+  .score-card .value{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--gold); margin-top:2px;}
+  .score-card .sub{font-size:11px; color:var(--chalk-dim); margin-top:2px;}
+  .score-card.you{border-color:var(--hardwood);}
+  .score-card.bot{border-color:#5B6B8C;}
+
+  .profile-banner{
+    background:var(--panel-bg-2); border:1px dashed var(--line); border-radius:6px;
+    padding:10px 14px; font-size:12.5px; color:var(--chalk-dim); margin-bottom:18px;
+  }
+  .profile-banner b{color:var(--chalk);}
+
+  h2{
+    font-family:'Oswald',sans-serif; font-size:15px; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--chalk-dim); margin:22px 0 10px 0;
+    border-bottom:1px solid var(--line); padding-bottom:6px;
+  }
+
+  /* Pool grid */
+  .pool-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px;}
+  .pcard{
+    background:var(--panel-bg); border:1px solid var(--line); border-radius:8px;
+    padding:12px; position:relative; transition:border-color .15s;
+  }
+  .pcard.nominable{border-color:var(--hardwood); cursor:pointer;}
+  .pcard.nominable:hover{background:var(--panel-bg-2);}
+  .pcard .pname{font-family:'Oswald',sans-serif; font-weight:600; font-size:15px;}
+  .pcard .ppos{font-size:11px; color:var(--chalk-dim); margin-bottom:6px;}
+  .pcard .pstats{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--chalk-dim);}
+  .nom-btn{
+    margin-top:8px; width:100%; padding:6px; background:var(--hardwood); color:#1a1206;
+    border:none; border-radius:5px; font-family:'Oswald',sans-serif; font-size:12px;
+    text-transform:uppercase; letter-spacing:.04em; font-weight:600; cursor:pointer;
+  }
+  .nom-btn:hover{filter:brightness(1.1);}
+
+  /* Auction panel */
+  .auction-panel{
+    background:linear-gradient(180deg,var(--panel-bg-2),var(--panel-bg));
+    border:1.5px solid var(--gold); border-radius:10px; padding:18px; margin-bottom:18px;
+  }
+  .auction-top{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;}
+  .auction-player{font-family:'Oswald',sans-serif; font-size:22px; font-weight:700;}
+  .auction-meta{color:var(--chalk-dim); font-size:12.5px; margin-top:2px;}
+  .bid-display{text-align:right;}
+  .bid-display .lbl{font-size:11px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:.06em;}
+  .bid-display .amt{font-family:'JetBrains Mono',monospace; font-size:34px; font-weight:700; color:var(--gold);}
+  .bid-display .who{font-size:12px; color:var(--chalk-dim);}
+  .auction-controls{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
+  .btn{
+    padding:10px 16px; border-radius:6px; border:1px solid var(--line); background:var(--panel-bg-2);
+    color:var(--chalk); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .btn:hover:not(:disabled){border-color:var(--hardwood);}
+  .btn:disabled{opacity:0.35; cursor:not-allowed;}
+  .btn.pass{border-color:var(--danger); color:var(--danger);}
+  .btn.pass:hover:not(:disabled){background:rgba(194,78,78,0.12);}
+  .waiting{color:var(--chalk-dim); font-size:13px; font-style:italic; margin-top:14px;}
+
+  /* Rosters */
+  .rosters{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .roster-col h3{
+    font-family:'Oswald',sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:.05em;
+    margin:0 0 8px 0; color:var(--chalk-dim);
+  }
+  .roster-slot{
+    display:flex; justify-content:space-between; padding:7px 10px; background:var(--panel-bg);
+    border:1px solid var(--line); border-radius:5px; margin-bottom:6px; font-size:13px;
+  }
+  .roster-slot.empty{color:#4A4C57; font-style:italic;}
+  .roster-slot .price{font-family:'JetBrains Mono',monospace; color:var(--gold);}
+
+  /* Log */
+  .log{
+    background:var(--panel-bg); border:1px solid var(--line); border-radius:6px;
+    padding:10px 14px; height:150px; overflow-y:auto; font-size:12.5px; color:var(--chalk-dim);
+  }
+  .log div{padding:2px 0; border-bottom:1px solid rgba(255,255,255,0.03);}
+  .log .you-log{color:var(--hardwood);}
+  .log .bot-log{color:#7C93C9;}
+  .log .sys-log{color:var(--gold);}
+
+  /* Results */
+  .results{background:var(--panel-bg); border:1px solid var(--gold); border-radius:10px; padding:20px;}
+  .results h2{border:none; margin-top:0;}
+  .winner-banner{font-family:'Oswald',sans-serif; font-size:26px; font-weight:700; margin-bottom:6px;}
+  .winner-banner.you{color:var(--hardwood);}
+  .winner-banner.bot{color:#7C93C9;}
+  table{width:100%; border-collapse:collapse; margin-top:12px; font-size:13px;}
+  th,td{text-align:left; padding:6px 8px; border-bottom:1px solid var(--line);}
+  th{color:var(--chalk-dim); font-family:'Oswald',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:.05em;}
+  td.num, th.num{text-align:right; font-family:'JetBrains Mono',monospace;}
+  .steal{color:var(--success);}
+  .overpay{color:var(--danger);}
+  .restart-btn{margin-top:16px;}
+
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏀 NBA Auction</h1>
+  <div class="subtitle">Draft a 5-man roster (2 Guards, 2 Forwards, 1 Center) with a $20 budget against a bot rival. Real NBA players come up one at a time, in an order only the game knows — bid or pass before the next name drops. Rosters are optimized into position slots; playing someone out of position costs a bit of value. Final scores are shown as a Talent Score and team shape, not raw numbers.</div>
+
+  <div id="setupScreen">
+    <div class="profile-banner">A new player pool and a new bot rival get generated every game. Ready?</div>
+    <button class="btn" id="startBtn" style="background:var(--hardwood); color:#1a1206; border:none;">Start Draft</button>
+  </div>
+
+  <div id="gameScreen" class="hidden">
+    <div class="scoreboard">
+      <div class="score-card you">
+        <div class="label">Your Budget</div>
+        <div class="value mono" id="youBudget">$20</div>
+        <div class="sub" id="youSlots">5 slots open</div>
+      </div>
+      <div class="score-card bot">
+        <div class="label">Bot Budget</div>
+        <div class="value mono" id="botBudget">$20</div>
+        <div class="sub" id="botSlots">5 slots open</div>
+      </div>
+    </div>
+
+    <div class="profile-banner" id="profileBanner"></div>
+
+    <div id="auctionArea"></div>
+
+    <h2>Rosters</h2>
+    <div class="rosters">
+      <div class="roster-col">
+        <h3>You <span id="youNeed" class="mono" style="font-size:10.5px; color:var(--chalk-dim); text-transform:none; letter-spacing:0;"></span></h3>
+        <div id="youRoster"></div>
+      </div>
+      <div class="roster-col">
+        <h3>Bot <span id="botNeed" class="mono" style="font-size:10.5px; color:var(--chalk-dim); text-transform:none; letter-spacing:0;"></span></h3>
+        <div id="botRoster"></div>
+      </div>
+    </div>
+
+    <h2>Draft Log</h2>
+    <div class="log" id="logBox"></div>
+  </div>
+
+  <div id="resultsScreen" class="hidden"></div>
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+// Real players, roughly tiered by current caliber. Stats are illustrative/approximate
+// (for gameplay feel, not live season stats) since exact numbers shift every year.
+const MASTER = [
+  // Superstar tier
+  {name:"Nikola Jokic", pos:"C", tier:"superstar", ppg:29.6, rpg:12.7, apg:10.2, def:6},
+  {name:"Luka Doncic", pos:"G", tier:"superstar", ppg:28.2, rpg:8.0, apg:7.7, def:4},
+  {name:"Giannis Antetokounmpo", pos:"F", tier:"superstar", ppg:30.9, rpg:11.4, apg:6.1, def:9},
+  {name:"Shai Gilgeous-Alexander", pos:"G", tier:"superstar", ppg:30.1, rpg:5.5, apg:6.2, def:7},
+  {name:"Jayson Tatum", pos:"F", tier:"superstar", ppg:26.8, rpg:8.7, apg:5.8, def:7},
+  {name:"Victor Wembanyama", pos:"C", tier:"superstar", ppg:24.3, rpg:11.0, apg:3.9, def:9},
+  {name:"Anthony Edwards", pos:"G", tier:"superstar", ppg:27.6, rpg:5.7, apg:4.5, def:6},
+  {name:"Kevin Durant", pos:"F", tier:"superstar", ppg:27.1, rpg:6.6, apg:4.2, def:6},
+  {name:"Joel Embiid", pos:"C", tier:"superstar", ppg:27.6, rpg:10.9, apg:5.2, def:8},
+  {name:"LeBron James", pos:"F", tier:"superstar", ppg:24.4, rpg:7.8, apg:8.2, def:5},
+
+  // Star tier
+  {name:"Stephen Curry", pos:"G", tier:"star", ppg:24.5, rpg:4.4, apg:5.9, def:4},
+  {name:"Devin Booker", pos:"G", tier:"star", ppg:25.6, rpg:4.4, apg:6.9, def:5},
+  {name:"Kawhi Leonard", pos:"F", tier:"star", ppg:23.7, rpg:6.1, apg:3.6, def:9},
+  {name:"Anthony Davis", pos:"F", tier:"star", ppg:24.7, rpg:11.6, apg:3.5, def:8},
+  {name:"Donovan Mitchell", pos:"G", tier:"star", ppg:26.1, rpg:4.9, apg:5.1, def:5},
+  {name:"Jaylen Brown", pos:"F", tier:"star", ppg:23.0, rpg:5.5, apg:3.6, def:7},
+  {name:"Tyrese Haliburton", pos:"G", tier:"star", ppg:18.6, rpg:3.7, apg:9.2, def:4},
+  {name:"Paolo Banchero", pos:"F", tier:"star", ppg:25.9, rpg:7.5, apg:4.1, def:5},
+  {name:"Ja Morant", pos:"G", tier:"star", ppg:23.2, rpg:4.0, apg:7.3, def:5},
+  {name:"Trae Young", pos:"G", tier:"star", ppg:22.5, rpg:3.0, apg:11.6, def:3},
+  {name:"Jalen Brunson", pos:"G", tier:"star", ppg:26.0, rpg:3.5, apg:6.7, def:4},
+  {name:"Damian Lillard", pos:"G", tier:"star", ppg:24.9, rpg:4.7, apg:7.1, def:3},
+  {name:"Kyrie Irving", pos:"G", tier:"star", ppg:24.7, rpg:4.8, apg:4.6, def:4},
+  {name:"Jimmy Butler", pos:"F", tier:"star", ppg:17.5, rpg:5.4, apg:4.8, def:8},
+  {name:"Cade Cunningham", pos:"G", tier:"star", ppg:26.1, rpg:6.1, apg:9.1, def:4},
+  {name:"Alperen Sengun", pos:"C", tier:"star", ppg:19.1, rpg:10.3, apg:4.9, def:6},
+
+  // Starter tier
+  {name:"Domantas Sabonis", pos:"C", tier:"starter", ppg:19.4, rpg:13.6, apg:5.9, def:5},
+  {name:"DeMar DeRozan", pos:"F", tier:"starter", ppg:22.0, rpg:4.3, apg:5.0, def:4},
+  {name:"Bam Adebayo", pos:"C", tier:"starter", ppg:16.7, rpg:9.6, apg:4.0, def:8},
+  {name:"Zion Williamson", pos:"F", tier:"starter", ppg:21.6, rpg:6.8, apg:4.7, def:5},
+  {name:"Julius Randle", pos:"F", tier:"starter", ppg:20.9, rpg:7.5, apg:4.7, def:4},
+  {name:"Karl-Anthony Towns", pos:"C", tier:"starter", ppg:22.5, rpg:11.1, apg:3.3, def:4},
+  {name:"Pascal Siakam", pos:"F", tier:"starter", ppg:20.2, rpg:6.9, apg:3.5, def:6},
+  {name:"Jrue Holiday", pos:"G", tier:"starter", ppg:12.5, rpg:4.6, apg:4.8, def:8},
+  {name:"CJ McCollum", pos:"G", tier:"starter", ppg:20.1, rpg:4.1, apg:4.2, def:4},
+  {name:"Tyler Herro", pos:"G", tier:"starter", ppg:23.9, rpg:5.5, apg:5.2, def:3},
+  {name:"Desmond Bane", pos:"G", tier:"starter", ppg:19.2, rpg:6.1, apg:5.3, def:5},
+  {name:"Brandon Ingram", pos:"F", tier:"starter", ppg:22.2, rpg:5.6, apg:5.2, def:4},
+  {name:"Scottie Barnes", pos:"F", tier:"starter", ppg:19.3, rpg:7.7, apg:5.8, def:7},
+  {name:"Franz Wagner", pos:"F", tier:"starter", ppg:24.1, rpg:5.7, apg:4.7, def:6},
+  {name:"Darius Garland", pos:"G", tier:"starter", ppg:20.6, rpg:2.9, apg:6.7, def:4},
+  {name:"Myles Turner", pos:"C", tier:"starter", ppg:15.6, rpg:6.5, apg:1.5, def:8},
+  {name:"Jarrett Allen", pos:"C", tier:"starter", ppg:13.5, rpg:9.7, apg:1.9, def:8},
+  {name:"Rudy Gobert", pos:"C", tier:"starter", ppg:12.0, rpg:10.9, apg:1.8, def:9},
+  {name:"Chet Holmgren", pos:"C", tier:"starter", ppg:15.0, rpg:8.0, apg:2.0, def:8},
+
+  // Role tier
+  {name:"Herbert Jones", pos:"F", tier:"role", ppg:11.2, rpg:4.1, apg:2.1, def:9},
+  {name:"Mikal Bridges", pos:"F", tier:"role", ppg:17.6, rpg:4.2, apg:3.3, def:8},
+  {name:"Jalen Williams", pos:"F", tier:"role", ppg:19.5, rpg:4.5, apg:4.6, def:6},
+  {name:"Alex Caruso", pos:"G", tier:"role", ppg:9.8, rpg:3.7, apg:3.6, def:9},
+  {name:"Klay Thompson", pos:"G", tier:"role", ppg:14.2, rpg:3.1, apg:2.2, def:5},
+  {name:"Draymond Green", pos:"F", tier:"role", ppg:8.5, rpg:6.9, apg:6.0, def:9},
+  {name:"Aaron Gordon", pos:"F", tier:"role", ppg:14.4, rpg:6.5, apg:3.4, def:6},
+  {name:"Bruce Brown", pos:"G", tier:"role", ppg:9.1, rpg:3.7, apg:2.5, def:6},
+  {name:"OG Anunoby", pos:"F", tier:"role", ppg:18.0, rpg:4.8, apg:2.2, def:9},
+  {name:"Derrick White", pos:"G", tier:"role", ppg:16.4, rpg:4.5, apg:4.8, def:8},
+  {name:"Austin Reaves", pos:"G", tier:"role", ppg:20.2, rpg:4.5, apg:5.8, def:4},
+  {name:"Josh Hart", pos:"F", tier:"role", ppg:13.6, rpg:9.6, apg:5.9, def:6},
+  {name:"Brook Lopez", pos:"C", tier:"role", ppg:13.0, rpg:5.0, apg:1.8, def:8},
+  {name:"Mike Conley", pos:"G", tier:"role", ppg:8.2, rpg:2.6, apg:4.5, def:6},
+  {name:"Kentavious Caldwell-Pope", pos:"G", tier:"role", ppg:8.7, rpg:2.2, apg:2.0, def:7},
+  {name:"Jaden McDaniels", pos:"F", tier:"role", ppg:12.2, rpg:3.0, apg:1.4, def:8},
+  {name:"Andrew Wiggins", pos:"F", tier:"role", ppg:18.0, rpg:4.5, apg:2.6, def:6},
+  {name:"Donte DiVincenzo", pos:"G", tier:"role", ppg:11.7, rpg:3.7, apg:3.6, def:5},
+  {name:"Norman Powell", pos:"G", tier:"role", ppg:21.8, rpg:3.2, apg:2.1, def:4},
+  {name:"Tobias Harris", pos:"F", tier:"role", ppg:13.7, rpg:5.9, apg:2.2, def:4},
+
+  // Bench tier
+  {name:"Gary Trent Jr.", pos:"G", tier:"bench", ppg:11.8, rpg:2.2, apg:1.3, def:5},
+  {name:"Naz Reid", pos:"C", tier:"bench", ppg:14.2, rpg:5.6, apg:2.0, def:5},
+  {name:"Bobby Portis", pos:"F", tier:"bench", ppg:13.6, rpg:7.4, apg:1.3, def:4},
+  {name:"Delon Wright", pos:"G", tier:"bench", ppg:6.5, rpg:2.9, apg:3.3, def:6},
+  {name:"Kelly Olynyk", pos:"C", tier:"bench", ppg:9.0, rpg:4.6, apg:2.6, def:3},
+  {name:"Cody Martin", pos:"F", tier:"bench", ppg:6.8, rpg:3.4, apg:1.8, def:6},
+  {name:"Duncan Robinson", pos:"G", tier:"bench", ppg:12.9, rpg:2.4, apg:2.0, def:2},
+  {name:"Jae'Sean Tate", pos:"F", tier:"bench", ppg:7.9, rpg:4.0, apg:2.3, def:6},
+  {name:"Malik Monk", pos:"G", tier:"bench", ppg:17.2, rpg:3.8, apg:5.6, def:3},
+  {name:"Payton Pritchard", pos:"G", tier:"bench", ppg:14.3, rpg:3.8, apg:3.5, def:4},
+  {name:"Luke Kennard", pos:"G", tier:"bench", ppg:8.9, rpg:2.8, apg:3.3, def:3},
+  {name:"T.J. McConnell", pos:"G", tier:"bench", ppg:9.1, rpg:2.4, apg:4.4, def:5},
+  {name:"Al Horford", pos:"C", tier:"bench", ppg:9.0, rpg:6.2, apg:2.1, def:7},
+  {name:"Kevon Looney", pos:"C", tier:"bench", ppg:4.5, rpg:6.1, apg:1.6, def:6},
+  {name:"Max Strus", pos:"G", tier:"bench", ppg:9.4, rpg:4.3, apg:3.2, def:4},
+  {name:"Obi Toppin", pos:"F", tier:"bench", ppg:10.5, rpg:4.0, apg:1.6, def:3},
+  {name:"Grayson Allen", pos:"G", tier:"bench", ppg:10.6, rpg:3.0, apg:2.1, def:4},
+  {name:"Caris LeVert", pos:"G", tier:"bench", ppg:10.2, rpg:2.8, apg:3.7, def:4},
+];
+const TIER_BASE = {superstar:95, star:72, starter:50, role:30, bench:15};
+const TIER_VALUE_BOUNDS = {
+  superstar:{min:86, max:100},
+  star:{min:66, max:84},
+  starter:{min:45, max:63},
+  role:{min:26, max:44},
+  bench:{min:10, max:25},
+};
+const STAR_POWER_FIXED_MAX = 100;
+
+// Stat-to-value formula. It is deterministic: same player, same true value every game.
+// Values are normalized within each tier, then clamped to that tier's bounds.
+const STAT_WEIGHTS = {ppg:1.55, rpg:1.15, apg:1.35, def:3.75};
+function statComposite(p){
+  return p.ppg*STAT_WEIGHTS.ppg + p.rpg*STAT_WEIGHTS.rpg + p.apg*STAT_WEIGHTS.apg + p.def*STAT_WEIGHTS.def;
+}
+function tierStatRange(tier){
+  const vals = MASTER.filter(p=>p.tier===tier).map(statComposite);
+  return {min:Math.min(...vals), max:Math.max(...vals)};
+}
+const TIER_STAT_RANGES = Object.fromEntries(Object.keys(TIER_BASE).map(t=>[t, tierStatRange(t)]));
+function statBasedTrueValue(player){
+  const bounds = TIER_VALUE_BOUNDS[player.tier];
+  const range = TIER_STAT_RANGES[player.tier];
+  const rawNorm = range.max===range.min ? 0.5 : (statComposite(player)-range.min)/(range.max-range.min);
+  const norm = clamp(rawNorm,0,1);
+  return clamp(Math.round(bounds.min + norm*(bounds.max-bounds.min)), bounds.min, bounds.max);
+}
+
+const POOL_PROFILES = [
+  {name:"Superteam Showcase", desc:"A loaded class — 4 superstars, 3 stars, and 3 random depth pieces.", groups:[
+    {tiers:["superstar"], count:4}, {tiers:["star"], count:3}, {tiers:["starter","role","bench"], count:3}
+  ]},
+  {name:"Balanced", desc:"A mixed class — 5 from the top two tiers, 4 from starter/role, and 1 bench piece.", groups:[
+    {tiers:["superstar","star"], count:5}, {tiers:["starter","role"], count:4}, {tiers:["bench"], count:1}
+  ]},
+  {name:"Top Heavy", desc:"Three superstars headline the draft, then seven role/bench players fill out the board.", groups:[
+    {tiers:["superstar"], count:3}, {tiers:["role","bench"], count:7}
+  ]},
+  {name:"Deep Sleeper", desc:"Only one superstar appears — the rest of the draft is about finding starter, role, and bench value.", groups:[
+    {tiers:["superstar"], count:1}, {tiers:["starter","role"], count:4}, {tiers:["bench"], count:5}
+  ]},
+];
+
+const BOT_PERSONAS = [
+  {
+    name:"Star Chaser",
+    flavor:"This bot is aggressive on premium names and is willing to pay up for top-tier talent.",
+    tierMult:{superstar:1.24, star:1.13, starter:0.99, role:0.88, bench:0.78},
+    statMult:{ppg:1.14, rpg:0.94, apg:1.00, def:0.88},
+    budgetDiscipline:1.08, aggression:0.94, caution:0.32, floor:0.42
+  },
+  {
+    name:"Value Hunter",
+    flavor:"This bot is disciplined, avoids bidding wars, and still scales spending with player quality.",
+    tierMult:{superstar:1.02, star:0.99, starter:0.94, role:0.88, bench:0.80},
+    statMult:{ppg:0.98, rpg:1.04, apg:1.05, def:1.05},
+    budgetDiscipline:0.86, aggression:0.80, caution:0.48, floor:0.28
+  },
+  {
+    name:"Balanced Builder",
+    flavor:"This bot plays close to the board and tries to build a clean, well-rounded roster.",
+    tierMult:{superstar:1.08, star:1.03, starter:0.97, role:0.90, bench:0.83},
+    statMult:{ppg:1.00, rpg:1.00, apg:1.00, def:1.00},
+    budgetDiscipline:0.98, aggression:0.87, caution:0.39, floor:0.34
+  },
+  {
+    name:"Cap Manager",
+    flavor:"This bot is cautious with the budget, but still reserves its biggest bids for the best players.",
+    tierMult:{superstar:1.05, star:1.00, starter:0.93, role:0.86, bench:0.78},
+    statMult:{ppg:0.96, rpg:1.03, apg:1.02, def:1.08},
+    budgetDiscipline:0.78, aggression:0.76, caution:0.52, floor:0.25
+  },
+];
+
+/* ---------------- STATE ---------------- */
+let G = null;
+
+function rand(min,max){ return min + Math.random()*(max-min); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+function samplePlayers(tiers, count, selectedNames){
+  const options = shuffle(MASTER.filter(p=>tiers.includes(p.tier) && !selectedNames.has(p.name)));
+  return options.slice(0,count);
+}
+
+function buildPool(){
+  const profile = pick(POOL_PROFILES);
+  const selected = [];
+  const selectedNames = new Set();
+  profile.groups.forEach(group=>{
+    const picks = samplePlayers(group.tiers, group.count, selectedNames);
+    picks.forEach(p=>{
+      selected.push(p);
+      selectedNames.add(p.name);
+    });
+  });
+  // Order = the sequence players will be revealed in, one at a time. Neither
+  // side gets to see this list ahead of time.
+  const order = shuffle(selected).map((p,idx)=>{
+    const trueValue = statBasedTrueValue(p);
+    return {
+      id: "p"+idx, name:p.name, pos:p.pos, tier:p.tier,
+      trueValue, ppg:p.ppg, rpg:p.rpg, apg:p.apg, def:p.def, drafted:false
+    };
+  });
+  return {profile, order};
+}
+
+function positionalFitMultiplier(side, player){
+  if(!G || !G.posSlots || !G.posSlots[side]) return 1;
+  const slots = G.posSlots[side];
+  if(G.slots[side]<=0) return 0;
+  if(slots[player.pos] > 0) return 1.06;
+  let bestDist = Infinity;
+  ['G','F','C'].forEach(pos=>{
+    if(slots[pos] > 0) bestDist = Math.min(bestDist, posDistance(player.pos, pos));
+  });
+  if(bestDist===Infinity) return 0;
+  return bestDist===1 ? 0.94 : 0.82;
+}
+
+function botEstimate(player, persona, side='bot'){
+  // The estimate is stable for a given player/persona: no random value wobble.
+  // The bot's strategy changes how it weights tier, stats, and roster fit.
+  const baseValue = statBasedTrueValue(player);
+  const neutralComposite = statComposite(player);
+  const personaComposite = player.ppg*STAT_WEIGHTS.ppg*persona.statMult.ppg
+    + player.rpg*STAT_WEIGHTS.rpg*persona.statMult.rpg
+    + player.apg*STAT_WEIGHTS.apg*persona.statMult.apg
+    + player.def*STAT_WEIGHTS.def*persona.statMult.def;
+  const statTilt = neutralComposite===0 ? 1 : personaComposite/neutralComposite;
+  const fit = positionalFitMultiplier(side, player);
+  return Math.round(baseValue * persona.tierMult[player.tier] * statTilt * fit);
+}
+
+function estimateToBidCap(estimate, persona, player){
+  const tierAnchor = {superstar:13, star:10, starter:7, role:4, bench:2}[player.tier];
+  const statAnchor = clamp(Math.round((estimate - 8) / 7), 1, 15);
+  return clamp(Math.round((tierAnchor*0.4 + statAnchor*0.6) * persona.budgetDiscipline), 1, 15);
+}
+
+function botLateDraftLeverage(player, est, normalWillingness, persona){
+  // If the user has only one roster spot left while the bot still needs multiple
+  // players, the bot should not artificially protect money beyond the $1-per-slot
+  // reserve. It can win this player and still fill the rest later, mostly
+  // uncontested, so good players get the full maxBid treatment.
+  if(!G || G.slots.user !== 1 || G.slots.bot <= 1) return false;
+  if(G.slots.bot <= G.slots.user) return false;
+
+  const qualityFloorByPersona = {
+    'Star Chaser': 4,
+    'Balanced Builder': 5,
+    'Value Hunter': 6,
+    'Cap Manager': 6,
+  };
+  const qualityFloor = qualityFloorByPersona[persona.name] || 5;
+  if(player.tier==='superstar' || player.tier==='star') return true;
+  if(player.tier==='starter' && normalWillingness >= qualityFloor) return true;
+  if(player.tier==='role' && normalWillingness >= qualityFloor + 2 && est >= 42) return true;
+  return false;
+}
+
+function botPushProbability(nextBid, cap, player, persona, leverage=false){
+  if(leverage) return 1;
+  const progress = nextBid / Math.max(cap,1);
+  let p = persona.aggression - progress*persona.caution;
+  if(persona.name==='Star Chaser' && (player.tier==='superstar' || player.tier==='star')) p += 0.06;
+  if(persona.name==='Cap Manager' && progress > 0.65) p -= 0.06;
+  if(persona.name==='Value Hunter' && progress > 0.7) p -= 0.08;
+  return clamp(p, persona.floor, 0.96);
+}
+
+/* ---------------- POSITIONS ---------------- */
+// Strict roster shape: 2 Guards, 2 Forwards, 1 Center per team.
+// After each win, the whole roster is re-optimized into G/G/F/F/C slots.
+// Out-of-position value penalties scale by distance from natural position
+// (G<->F is a short hop, G<->C is a big one).
+const POS_INDEX = {G:0, F:1, C:2};
+function posDistance(a,b){ return Math.abs(POS_INDEX[a]-POS_INDEX[b]); }
+function penaltyMultiplier(dist){ return dist===0 ? 1 : (dist===1 ? 0.92 : 0.78); }
+
+function optimizeRosterPositions(side){
+  const roster = G.rosters[side];
+  const slotLayout = ['G','G','F','F','C'];
+  const used = Array(slotLayout.length).fill(false);
+  const assignment = Array(roster.length).fill(null);
+  let bestAssignment = null;
+  let bestScore = -Infinity;
+  let bestDistance = Infinity;
+
+  function search(playerIdx, score, distanceTotal){
+    if(playerIdx >= roster.length){
+      if(score > bestScore || (score===bestScore && distanceTotal < bestDistance)){
+        bestScore = score;
+        bestDistance = distanceTotal;
+        bestAssignment = assignment.slice();
+      }
+      return;
+    }
+    const player = roster[playerIdx];
+    for(let slotIdx=0; slotIdx<slotLayout.length; slotIdx++){
+      if(used[slotIdx]) continue;
+      const assignedPos = slotLayout[slotIdx];
+      const dist = posDistance(player.pos, assignedPos);
+      const adjusted = Math.round(player.trueValue * penaltyMultiplier(dist));
+      used[slotIdx] = true;
+      assignment[playerIdx] = assignedPos;
+      search(playerIdx+1, score+adjusted, distanceTotal+dist);
+      assignment[playerIdx] = null;
+      used[slotIdx] = false;
+    }
+  }
+
+  search(0, 0, 0);
+
+  const remaining = {G:2, F:2, C:1};
+  roster.forEach((player, idx)=>{
+    const assignedPos = bestAssignment ? bestAssignment[idx] : player.pos;
+    const dist = posDistance(player.pos, assignedPos);
+    player.assignedPos = assignedPos;
+    player.posPenaltyDist = dist;
+    player.adjustedValue = Math.round(player.trueValue * penaltyMultiplier(dist));
+    remaining[assignedPos] -= 1;
+  });
+  G.posSlots[side] = remaining;
+}
+
+function assignPosition(side, player){
+  // Kept as the public hook after a win, but it now optimizes the whole roster
+  // instead of greedily locking earlier picks into inefficient slots.
+  optimizeRosterPositions(side);
+}
+
+function posNeedStr(side){
+  const s = G.posSlots[side];
+  const parts = [];
+  if(s.G>0) parts.push(s.G+' G');
+  if(s.F>0) parts.push(s.F+' F');
+  if(s.C>0) parts.push(s.C+' C');
+  return parts.length ? 'needs '+parts.join(', ') : 'roster full';
+}
+
+/* ---------------- GAME INIT ---------------- */
+function newGame(){
+  const {profile, order} = buildPool();
+  const persona = pick(BOT_PERSONAS);
+  const initialFirst = Math.random()<0.5 ? 'user' : 'bot';
+  G = {
+    profile, persona, order,
+    budgets:{user:20, bot:20},
+    slots:{user:5, bot:5},
+    posSlots:{user:{G:2,F:2,C:1}, bot:{G:2,F:2,C:1}},
+    rosters:{user:[], bot:[]},
+    initialFirst,
+    roundIndex: 0,
+    nominationCount: 0,
+    auction: null,
+    log: [],
+    over:false
+  };
+  debugMsg(`Talent pool locked in: "${profile.name}" — ${profile.desc}`);
+  debugMsg(`Bot rival scouting profile: ${persona.name} — ${persona.flavor}`);
+  debugMsg(`Players will be revealed one at a time — nobody knows who's coming next.`);
+  render();
+  startRound(0);
+}
+
+function debugMsg(text){
+  console.info('[NBA Auction]', text);
+}
+
+function logMsg(who, text){
+  G.log.push({who, text});
+  const box = document.getElementById('logBox');
+  if(box){
+    const d = document.createElement('div');
+    d.className = who+'-log';
+    d.textContent = text;
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+/* ---------------- BID LOGIC HELPERS ---------------- */
+function maxBid(side){
+  if(G.slots[side]<=0) return 0;
+  const slotsAfterThis = G.slots[side]-1; // reserve $1 for every OTHER remaining slot
+  return G.budgets[side] - slotsAfterThis;
+}
+
+/* ---------------- SEQUENTIAL REVEAL ---------------- */
+// The game (not either player) decides who comes up next. Order was shuffled
+// once at pool-build time and neither side can see ahead in it. If a player is
+// passed by both sides before any bid is placed, that player is moved to the back of the pool.
+function firstBidderFor(nominationNumber){
+  let f = (nominationNumber % 2 === 0) ? G.initialFirst : (G.initialFirst==='user'?'bot':'user');
+  if(G.slots[f]<=0) f = f==='user'?'bot':'user'; // skip a side that already filled its roster
+  return f;
+}
+
+function startRound(idx){
+  if(G.slots.user<=0 && G.slots.bot<=0){ endGame(); return; }
+  if(idx >= G.order.length){ endGame(); return; }
+  const player = G.order[idx];
+  const opener = firstBidderFor(G.nominationCount);
+  G.nominationCount += 1;
+  logMsg('sys', `Player ${G.roundIndex+1} of ${G.order.length} revealed: ${player.name}. ${opener==='user'?'You':'Bot'} gets first action.`);
+  startAuction(player.id, opener);
+}
+
+function startAuction(playerId, opener){
+  G.auction = { playerId, bid:0, bidder:null, turn:opener, openDeclines:{user:false, bot:false} };
+  render();
+  if(G.auction.turn==='bot') setTimeout(botAuctionMove, 700);
+}
+
+function otherSide(side){ return side==='user' ? 'bot' : 'user'; }
+
+function recycleAuctionPlayer(){
+  if(!G.auction) return;
+  const idx = G.order.findIndex(p=>p.id===G.auction.playerId);
+  if(idx < 0) return;
+  const [player] = G.order.splice(idx,1);
+  G.order.push(player);
+  logMsg('sys', `No opening bid — ${player.name} moves to the back of the pool.`);
+  G.auction = null;
+  render();
+}
+
+function passBeforeOpeningBid(side){
+  if(!G.auction || G.auction.bidder) return;
+  const player = G.order.find(p=>p.id===G.auction.playerId);
+  G.auction.openDeclines[side] = true;
+  logMsg(side==='user'?'you':'bot', `${side==='user'?'You':'Bot'} pass before bidding on ${player.name}.`);
+
+  const other = otherSide(side);
+  if(G.slots[other] > 0 && !G.auction.openDeclines[other]){
+    G.auction.turn = other;
+    logMsg('sys', `${other==='user'?'You still have':'Bot still has'} the option to open bidding on ${player.name}.`);
+    render();
+    if(other==='bot') setTimeout(botAuctionMove, 700);
+    return;
+  }
+
+  recycleAuctionPlayer();
+}
+
+/* ---------------- BIDDING ---------------- */
+function userRaise(amount){
+  if(!G.auction || G.auction.turn!=='user') return;
+  const openingBid = G.auction.bid===0;
+  const newBid = G.auction.bid + amount;
+  if(newBid > maxBid('user')) return;
+  G.auction.bid = newBid;
+  G.auction.bidder = 'user';
+  G.auction.turn = 'bot';
+  logMsg('you', openingBid ? `You open at $${newBid}.` : `You raise to $${newBid}.`);
+  render();
+  setTimeout(botAuctionMove, 700);
+}
+
+function userPass(){
+  if(!G.auction || G.auction.turn!=='user') return;
+  if(!G.auction.bidder){
+    passBeforeOpeningBid('user');
+    return;
+  }
+  logMsg('you', `You pass at $${G.auction.bid}.`);
+  resolveAuction(G.auction.bidder);
+}
+
+function botOpeningProbability(player, cap, est, persona){
+  const baseByTier = {superstar:0.98, star:0.92, starter:0.78, role:0.58, bench:0.40};
+  let p = baseByTier[player.tier] || 0.65;
+  if(persona.name==='Star Chaser') p += (player.tier==='superstar' || player.tier==='star') ? 0.04 : -0.08;
+  if(persona.name==='Value Hunter') p -= player.tier==='bench' ? 0.08 : 0.03;
+  if(persona.name==='Cap Manager') p -= 0.10;
+  if(persona.name==='Balanced Builder') p += 0.00;
+  if(cap >= 8) p += 0.04;
+  if(cap <= 2) p -= 0.08;
+  // When the draft is getting tight, the bot becomes less willing to punt every option.
+  const botOpenSlots = G.slots.bot;
+  const undraftedLeft = G.order.length - G.roundIndex;
+  if(botOpenSlots >= undraftedLeft - 1) p += 0.18;
+  return clamp(p, 0.18, 0.99);
+}
+
+function botAuctionMove(){
+  if(!G.auction || G.auction.turn!=='bot') return;
+  const player = G.order.find(p=>p.id===G.auction.playerId);
+  const est = botEstimate(player, G.persona, 'bot');
+  const normalWillingness = estimateToBidCap(est, G.persona, player);
+  const leverage = botLateDraftLeverage(player, est, normalWillingness, G.persona);
+  const willingness = leverage ? maxBid('bot') : normalWillingness;
+  const cap = Math.min(willingness, maxBid('bot'));
+  const nextBid = G.auction.bid + 1;
+  const openingBid = G.auction.bid===0;
+
+  if(nextBid > cap){
+    if(openingBid){
+      passBeforeOpeningBid('bot');
+    } else {
+      logMsg('bot', `Bot passes on ${player.name} at $${G.auction.bid}.`);
+      resolveAuction(G.auction.bidder);
+    }
+    return;
+  }
+
+  if(openingBid){
+    const wantsToOpen = leverage || Math.random() < botOpeningProbability(player, cap, est, G.persona);
+    if(!wantsToOpen){
+      passBeforeOpeningBid('bot');
+      return;
+    }
+  } else {
+    // Occasionally the bot backs off before its cap, with the chance controlled by persona.
+    const pushThrough = Math.random() < botPushProbability(nextBid, cap, player, G.persona, leverage);
+    if(!pushThrough){
+      logMsg('bot', `Bot passes on ${player.name} at $${G.auction.bid}.`);
+      resolveAuction(G.auction.bidder);
+      return;
+    }
+  }
+
+  G.auction.bid = nextBid;
+  G.auction.bidder = 'bot';
+  G.auction.turn = 'user';
+  logMsg('bot', openingBid ? `Bot opens at $${nextBid}.` : `Bot raises to $${nextBid}.`);
+  render();
+}
+
+function resolveAuction(winnerSide){
+  if(!G.auction || !winnerSide) return;
+  const player = G.order.find(p=>p.id===G.auction.playerId);
+  const price = G.auction.bid;
+  if(price <= 0){ recycleAuctionPlayer(); return; }
+  player.drafted = true;
+  player.soldTo = winnerSide;
+  player.soldPrice = price;
+  G.budgets[winnerSide] -= price;
+  G.slots[winnerSide] -= 1;
+  G.rosters[winnerSide].push(player);
+  assignPosition(winnerSide, player);
+  logMsg('sys', `${winnerSide==='user'?'YOU win':'BOT wins'} ${player.name} for $${price} — slotted at ${player.assignedPos}${player.assignedPos!==player.pos?' (off natural position)':''}.`);
+  G.auction = null;
+  G.roundIndex += 1;
+
+  if(G.roundIndex >= G.order.length || (G.slots.user<=0 && G.slots.bot<=0)){
+    endGame();
+    return;
+  }
+  render(); // shows the "Reveal Next Player" prompt
+}
+
+/* ---------------- RESULTS ---------------- */
+/* ---------------- RESULTS ---------------- */
+function topNSum(arr, n){ return arr.slice().sort((a,b)=>b-a).slice(0,n).reduce((a,b)=>a+b,0); }
+function topNAvg(arr, n){ const vals = arr.slice().sort((a,b)=>b-a).slice(0,n); return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0; }
+
+function teamRawAdj(side){
+  const roster = G.rosters[side];
+  return {
+    raw: roster.reduce((s,p)=>s+p.trueValue,0),
+    adj: roster.reduce((s,p)=>s+p.adjustedValue,0)
+  };
+}
+
+function teamAxes(side, maxes){
+  const roster = G.rosters[side];
+  const sumPpg = roster.reduce((s,p)=>s+p.ppg,0);
+  const sumRpg = roster.reduce((s,p)=>s+p.rpg,0);
+  const sumApg = roster.reduce((s,p)=>s+p.apg,0);
+  const sumDef = roster.reduce((s,p)=>s+p.def,0);
+  const teamTop3Avg = topNAvg(roster.map(p=>p.trueValue), 3);
+  const poolScaledStarPower = maxes.starPowerPoolAvg ? teamTop3Avg/maxes.starPowerPoolAvg*100 : 0;
+  const fixedScaledStarPower = teamTop3Avg/STAR_POWER_FIXED_MAX*100;
+  const starPower = clamp(Math.round((poolScaledStarPower + fixedScaledStarPower)/2),0,100);
+  return [
+    clamp(Math.round(sumPpg/maxes.ppg*100),0,100),
+    clamp(Math.round(sumRpg/maxes.rpg*100),0,100),
+    clamp(Math.round(sumApg/maxes.apg*100),0,100),
+    starPower,
+    clamp(Math.round(sumDef/maxes.def*100),0,100),
+  ];
+}
+
+function radarPoints(vals, cx, cy, maxR){
+  return vals.map((v,i)=>{
+    const angle = -Math.PI/2 + i*(2*Math.PI/5);
+    const r = (v/100)*maxR;
+    return `${(cx+r*Math.cos(angle)).toFixed(1)},${(cy+r*Math.sin(angle)).toFixed(1)}`;
+  }).join(' ');
+}
+
+function buildRadarSVG(labels, userVals, botVals){
+  const cx=160, cy=145, maxR=100;
+  const grid = [20,40,60,80,100].map(lvl=>{
+    const pts = labels.map((_,i)=>{
+      const angle=-Math.PI/2+i*(2*Math.PI/5);
+      const r=(lvl/100)*maxR;
+      return `${(cx+r*Math.cos(angle)).toFixed(1)},${(cy+r*Math.sin(angle)).toFixed(1)}`;
+    }).join(' ');
+    return `<polygon points="${pts}" fill="none" stroke="#33353F" stroke-width="1"/>`;
+  }).join('');
+  const axes = labels.map((lbl,i)=>{
+    const angle=-Math.PI/2+i*(2*Math.PI/5);
+    const x2=cx+maxR*Math.cos(angle), y2=cy+maxR*Math.sin(angle);
+    const lx=cx+(maxR+28)*Math.cos(angle), ly=cy+(maxR+28)*Math.sin(angle);
+    return `<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#33353F" stroke-width="1"/>
+    <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" fill="#9A9CA8" font-size="11" font-family="Oswald, sans-serif" text-anchor="middle" dominant-baseline="middle">${lbl}</text>`;
+  }).join('');
+  const userPts = radarPoints(userVals,cx,cy,maxR);
+  const botPts = radarPoints(botVals,cx,cy,maxR);
+  return `<svg viewBox="0 0 320 300" width="100%" style="max-width:380px; display:block; margin:0 auto;">
+    ${grid}${axes}
+    <polygon points="${userPts}" fill="#C9862B" fill-opacity="0.35" stroke="#C9862B" stroke-width="2"/>
+    <polygon points="${botPts}" fill="#5B6B8C" fill-opacity="0.35" stroke="#7C93C9" stroke-width="2"/>
+  </svg>`;
+}
+
+function endGame(){
+  G.over = true;
+  renderResults();
+}
+
+function renderResults(){
+  document.getElementById('gameScreen').classList.add('hidden');
+  const rs = document.getElementById('resultsScreen');
+  rs.classList.remove('hidden');
+
+  const userTA = teamRawAdj('user');
+  const botTA = teamRawAdj('bot');
+  const top5Raw = topNSum(G.order.map(p=>p.trueValue), 5);
+  const userScore = clamp(Math.round(userTA.adj/top5Raw*100),0,100);
+  const botScore = clamp(Math.round(botTA.adj/top5Raw*100),0,100);
+  const winner = userScore===botScore ? 'tie' : (userScore>botScore ? 'user' : 'bot');
+
+  const maxes = {
+    ppg: topNSum(G.order.map(p=>p.ppg),5),
+    rpg: topNSum(G.order.map(p=>p.rpg),5),
+    apg: topNSum(G.order.map(p=>p.apg),5),
+    def: topNSum(G.order.map(p=>p.def),5),
+    starPowerPoolAvg: topNAvg(G.order.map(p=>p.trueValue),3),
+  };
+  const labels = ['Scoring','Rebounding','Playmaking','Star Power','Defense'];
+  const userAxes = teamAxes('user', maxes);
+  const botAxes = teamAxes('bot', maxes);
+
+  const winnerLabel = winner==='tie' ? "It's a tie!" : (winner==='user' ? 'You win the draft! 🏆' : 'Bot wins the draft.');
+  const winnerClass = winner==='bot' ? 'bot' : 'you';
+
+  // Steal/overpay tags use hidden true value internally but never print the raw number.
+  const totalPoolValue = G.order.reduce((s,p)=>s+p.trueValue,0);
+  const priceScale = totalPoolValue/40;
+  const rows = (side)=> rosterByPosition(side).map(p=>{
+    const expectedValue = p.soldPrice*priceScale;
+    const tag = expectedValue < p.trueValue*0.75 ? '<span class="steal">steal</span>'
+              : expectedValue > p.trueValue*1.35 ? '<span class="overpay">overpay</span>' : '';
+    const oopNote = p.assignedPos!==p.pos
+      ? ` <span style="color:var(--chalk-dim); font-size:11px;">(natural ${p.pos}${p.posPenaltyDist===2?', big shift':''})</span>`
+      : '';
+    return `<tr><td>${p.name}${oopNote}</td><td>${p.assignedPos}</td><td class="num">$${p.soldPrice}</td><td>${tag}</td></tr>`;
+  }).join('');
+
+  rs.innerHTML = `
+    <div class="results">
+      <div class="winner-banner ${winnerClass}">${winnerLabel}</div>
+      <div class="scoreboard" style="margin-top:6px; margin-bottom:6px;">
+        <div class="score-card you">
+          <div class="label">Your Talent Score</div>
+          <div class="value mono">${userScore}<span style="font-size:14px; color:var(--chalk-dim);">/100</span></div>
+        </div>
+        <div class="score-card bot">
+          <div class="label">Bot Talent Score</div>
+          <div class="value mono">${botScore}<span style="font-size:14px; color:var(--chalk-dim);">/100</span></div>
+        </div>
+      </div>
+      <h2>Team Shape</h2>
+      ${buildRadarSVG(labels, userAxes, botAxes)}
+      <div style="text-align:center; font-size:12px; color:var(--chalk-dim); margin-top:4px;">
+        <span style="color:var(--hardwood);">■</span> You &nbsp;&nbsp; <span style="color:#7C93C9;">■</span> Bot
+      </div>
+      <h2>Your Roster</h2>
+      <table><tr><th>Player</th><th>Pos</th><th class="num">Paid</th><th></th></tr>${rows('user')}</table>
+      <h2>Bot Roster</h2>
+      <table><tr><th>Player</th><th>Pos</th><th class="num">Paid</th><th></th></tr>${rows('bot')}</table>
+      <button class="btn restart-btn" style="background:var(--hardwood); color:#1a1206; border:none;" onclick="restart()">Play Again (New Pool)</button>
+    </div>`;
+}
+
+/* ---------------- RENDER ---------------- */
+function render(){
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('gameScreen').classList.remove('hidden');
+  document.getElementById('resultsScreen').classList.add('hidden');
+
+  document.getElementById('youBudget').textContent = '$'+G.budgets.user;
+  document.getElementById('botBudget').textContent = '$'+G.budgets.bot;
+  document.getElementById('youSlots').textContent = G.slots.user+' slots open';
+  document.getElementById('botSlots').textContent = G.slots.bot+' slots open';
+  const profileBanner = document.getElementById('profileBanner');
+  profileBanner.classList.add('hidden');
+  profileBanner.innerHTML = '';
+
+  // Auction area
+  const aArea = document.getElementById('auctionArea');
+  if(G.auction){
+    const player = G.order.find(p=>p.id===G.auction.playerId);
+    const userTurn = G.auction.turn==='user';
+    const noBidYet = !G.auction.bidder;
+    const nb1 = G.auction.bid+1, nb2 = G.auction.bid+2, nb5 = G.auction.bid+5;
+    const cap = maxBid('user');
+    const bidLabel = noBidYet ? 'No bid yet' : '$'+G.auction.bid;
+    const openDeclines = G.auction.openDeclines || {user:false, bot:false};
+    const otherDeclined = noBidYet && openDeclines[userTurn ? 'bot' : 'user'];
+    const holderLabel = noBidYet
+      ? (otherDeclined
+        ? `${userTurn?'bot':'you'} passed; ${userTurn?'your':'bot'} chance to open`
+        : `${G.auction.turn==='user'?'your':'bot'} first action`)
+      : `held by ${G.auction.bidder==='user'?'you':'bot'}`;
+    const actionVerb = noBidYet ? 'Open at' : 'Raise to';
+    const passLabel = noBidYet ? (otherDeclined ? 'Pass / Send Back' : 'Pass') : 'Pass';
+    aArea.innerHTML = `
+      <div class="auction-panel">
+        <div class="auction-top">
+          <div>
+            <div class="auction-player">${player.name}</div>
+            <div class="auction-meta">${player.pos} · ${player.ppg} PPG · ${player.rpg} RPG · ${player.apg} APG · DEF ${player.def}/10</div>
+          </div>
+          <div class="bid-display">
+            <div class="lbl">Current Bid</div>
+            <div class="amt" style="font-size:${noBidYet?'24px':'34px'};">${bidLabel}</div>
+            <div class="who">${holderLabel}</div>
+          </div>
+        </div>
+        ${userTurn ? `
+        <div class="auction-controls">
+          <button class="btn" onclick="userRaise(1)" ${nb1>cap?'disabled':''}>${actionVerb} $${nb1}</button>
+          <button class="btn" onclick="userRaise(2)" ${nb2>cap?'disabled':''}>${actionVerb} $${nb2}</button>
+          <button class="btn" onclick="userRaise(5)" ${nb5>cap?'disabled':''}>${actionVerb} $${nb5}</button>
+          <button class="btn pass" onclick="userPass()">${passLabel}</button>
+        </div>` : `<div class="waiting">Waiting on bot...</div>`}
+      </div>`;
+  } else if(!G.over){
+    aArea.innerHTML = `
+      <div class="auction-panel" style="text-align:center;">
+        <div style="color:var(--chalk-dim); margin-bottom:12px;">
+          ${G.roundIndex} of ${G.order.length} players drafted so far. Nobody knows who's up next.
+        </div>
+        <button class="btn" style="background:var(--hardwood); color:#1a1206; border:none;" onclick="startRound(${G.roundIndex})">Reveal Next Player</button>
+      </div>`;
+  }
+
+  // Rosters
+  document.getElementById('youNeed').textContent = '('+posNeedStr('user')+')';
+  document.getElementById('botNeed').textContent = '('+posNeedStr('bot')+')';
+  document.getElementById('youRoster').innerHTML = rosterHtml('user');
+  document.getElementById('botRoster').innerHTML = rosterHtml('bot');
+}
+
+const ROSTER_LAYOUT = ['G','G','F','F','C'];
+
+function rosterByPosition(side){
+  const byPos = {G:[], F:[], C:[]};
+  G.rosters[side].forEach(p=> byPos[p.assignedPos].push(p));
+  const counts = {G:0, F:0, C:0};
+  return ROSTER_LAYOUT.map(posLabel => byPos[posLabel][counts[posLabel]++] || null).filter(Boolean);
+}
+
+function rosterHtml(side){
+  const byPos = {G:[], F:[], C:[]};
+  G.rosters[side].forEach(p=> byPos[p.assignedPos].push(p));
+  const counts = {G:0, F:0, C:0};
+  let html = '';
+  ROSTER_LAYOUT.forEach(posLabel=>{
+    const p = byPos[posLabel][counts[posLabel]++];
+    if(p){
+      const oop = p.pos !== p.assignedPos;
+      const oopTag = oop
+        ? `<span style="color:${p.posPenaltyDist===2?'var(--danger)':'var(--gold)'}; font-size:10px;" title="Natural position: ${p.pos}">·OOP</span>`
+        : '';
+      html += `<div class="roster-slot"><span><span class="mono" style="color:var(--chalk-dim);">[${posLabel}]</span> ${p.name} ${oopTag}</span><span class="price">$${p.soldPrice}</span></div>`;
+    } else {
+      html += `<div class="roster-slot empty"><span class="mono" style="color:#4A4C57;">[${posLabel}]</span> Open</div>`;
+    }
+  });
+  return html;
+}
+
+function restart(){
+  document.getElementById('logBox').innerHTML='';
+  newGame();
+}
+
+document.getElementById('startBtn').addEventListener('click', newGame);
+</script>
+</body>
+</html>
